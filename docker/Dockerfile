@@ -1,4 +1,5 @@
-FROM nvidia/cuda:10.0-devel-ubuntu18.04
+ARG CUDA_DOCKER_VERSION=11.3.1-devel-ubuntu20.04
+FROM nvidia/cuda:${CUDA_DOCKER_VERSION}
 
 ARG https_proxy
 ARG http_proxy
