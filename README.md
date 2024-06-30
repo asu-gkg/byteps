@@ -69,7 +69,7 @@ pip3 install byteps
 You can try out the latest features by directly installing from master branch:
 
 ```
-git clone --recursive https://github.com/bytedance/byteps
+git clone --recursive https://github.com/asu-gkg/byteps.git
 cd byteps
 python3 setup.py install
 ```
