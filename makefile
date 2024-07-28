@@ -34,4 +34,4 @@ run-scheduler:
 	export DMLC_ROLE=scheduler; bpslaunch
 
 test-benchmark:
-	bpslaunch example/pytorch/benchmark_byteps.py
+	bpslaunch python3 example/pytorch/benchmark_byteps.py
