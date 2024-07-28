@@ -32,3 +32,6 @@ run-server:
 
 run-scheduler:
 	export DMLC_ROLE=scheduler; python3 -c "import byteps.server"
+
+run-worker:
+	python3 -c "import byteps.misc.imagenet18"
