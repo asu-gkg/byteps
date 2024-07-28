@@ -7,5 +7,8 @@ export DMLC_PS_ROOT_PORT=1234
 install:
 	sudo python3 setup.py install
 
+build:
+	sudo python3 setup.py build_ext --inplace
+
 run-server:
 	python3 -c "import byteps.server"
