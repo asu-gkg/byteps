@@ -28,10 +28,10 @@ clean:
 	sudo rm -rf build *.egg-info dist
 
 run-server:
-	export DMLC_ROLE=server; python3 -c "import byteps.server"
+	export DMLC_ROLE=server; bpslaunch
 
 run-scheduler:
-	export DMLC_ROLE=scheduler; python3 -c "import byteps.server"
+	export DMLC_ROLE=scheduler; bpslaunch
 
 test-benchmark:
-	python3 example/pytorch/benchmark_byteps.py
+	bpslaunch example/pytorch/benchmark_byteps.py
