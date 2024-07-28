@@ -28,8 +28,6 @@ else:
     import pre_setup as pre_setup
 
 server_lib = Extension('byteps.server.c_lib', [])
-tensorflow_lib = Extension('byteps.tensorflow.c_lib', [])
-mxnet_lib = Extension('byteps.mxnet.c_lib', [])
 pytorch_lib = Extension('byteps.torch.c_lib', [])
 
 # Package meta-data.
@@ -931,19 +929,6 @@ class custom_build_ext(build_ext):
         # To resolve tf-gcc incompatibility
         has_cxx_flag = False
         glibcxx_flag = False
-        if not without_tensorflow():
-            try:
-                import tensorflow as tf
-                make_option += 'ADD_CFLAGS="'
-                for flag in tf.sysconfig.get_compile_flags():
-                    if 'D_GLIBCXX_USE_CXX11_ABI' in flag:
-                        has_cxx_flag = True
-                        glibcxx_flag = False if (flag[-1]=='0') else True
-                        make_option += flag + ' '
-                        break
-                make_option += '" '
-            except:
-                pass
 
         # To resolve torch-gcc incompatibility
         if not without_pytorch():
@@ -1014,18 +999,6 @@ class custom_build_ext(build_ext):
         if not without_pytorch():
             dummy_import_torch()
 
-        if not without_tensorflow():
-            try:
-                build_tf_extension(self, options)
-                built_plugins.append(True)
-                print('INFO: Tensorflow extension is built successfully.')
-            except:
-                if not with_tensorflow():
-                    print('INFO: Unable to build TensorFlow plugin, will skip it.\n\n'
-                          '%s' % traceback.format_exc())
-                    built_plugins.append(False)
-                else:
-                    raise
         if not without_pytorch():
             try:
                 torch_version = check_torch_version()
@@ -1039,25 +1012,6 @@ class custom_build_ext(build_ext):
                     built_plugins.append(False)
                 else:
                     raise
-        if not int(os.environ.get('BYTEPS_WITHOUT_MXNET', 0)):
-            # fix "libcuda.so.1 not found" issue
-            cuda_home = os.environ.get('BYTEPS_CUDA_HOME', '/usr/local/cuda')
-            cuda_stub_path = cuda_home + '/lib64/stubs'
-            ln_command = "cd " + cuda_stub_path + "; ln -sf libcuda.so libcuda.so.1"
-            os.system(ln_command)
-            try:
-                build_mx_extension(self, options)
-                built_plugins.append(True)
-                print('INFO: MXNet extension is built successfully.')
-            except:
-                if not int(os.environ.get('BYTEPS_WITH_MXNET', 0)):
-                    print('INFO: Unable to build MXNet plugin, will skip it.\n\n'
-                          '%s' % traceback.format_exc())
-                    built_plugins.append(False)
-                else:
-                    raise
-            finally:
-                os.system("rm -rf " + cuda_stub_path + "/libcuda.so.1")
 
         if not built_plugins:
             print('INFO: Only server module is built.')
@@ -1078,12 +1032,7 @@ if os.path.exists('launcher/launch.py'):
         os.mkdir('bin')
     shutil.copyfile('launcher/launch.py', 'bin/bpslaunch')
 
-extensions_to_build = [server_lib, tensorflow_lib, mxnet_lib, pytorch_lib]
-if int(os.environ.get('BYTEPS_WITHOUT_MXNET', 0)):
-    extensions_to_build.remove(mxnet_lib)
-
-if without_tensorflow():
-    extensions_to_build.remove(tensorflow_lib)
+extensions_to_build = [server_lib, pytorch_lib]
 
 if without_pytorch():
     extensions_to_build.remove(pytorch_lib)
