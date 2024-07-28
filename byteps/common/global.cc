@@ -190,7 +190,7 @@ void BytePSGlobal::Init() {
   // Init NCCL
   _nccl_manager = std::make_shared<NcclManager>(_basic_comm);
   _is_cross_pcie_switch = (_local_size > _nccl_manager->GetSize());
-
+  
   // Bind to NUMA node
   if (_is_cross_pcie_switch) {
     auto numa_index = (GetPcieSwitchIndex() > numa_max_node())
