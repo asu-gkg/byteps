@@ -64,12 +64,24 @@ Below, we explain how to install BytePS by yourself. There are two options.
 pip3 install byteps
 ```
 
+### Use Docker to develop
+``` 
+ sudo docker run -it --rm --gpus all                        \
+                 --device /dev/nvidia0:/dev/nvidia0         \
+                 --device /dev/nvidiactl:/dev/nvidiactl     \
+                 --device /dev/nvidia-uvm:/dev/nvidia-uvm   \
+                 --device /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools \
+                 
+                 -p 2222:22                                 \
+                 bytepsimage/pytorch bash
+```
+
 ### Build from source code
 
 You can try out the latest features by directly installing from master branch:
 
 ```
-git clone --recursive https://github.com/asu-gkg/byteps.git
+git clone https://github.com/asu-gkg/byteps.git
 cd byteps
 python3 setup.py install
 ```

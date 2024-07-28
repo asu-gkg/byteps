@@ -174,7 +174,7 @@ def get_mpi_flags():
 
 def get_cpp_flags(build_ext):
     last_err = None
-    default_flags = ['-std=c++11', '-fPIC', '-Ofast', '-Wall', '-fopenmp', '-march=native', '-mno-avx512f']
+    default_flags = ['-std=c++17', '-fPIC', '-Ofast', '-Wall', '-fopenmp', '-march=native', '-mno-avx512f']
     flags_to_try = []
     if sys.platform == 'darwin':
         # Darwin most likely will have Clang, which has libc++.
@@ -831,7 +831,7 @@ def is_torch_cuda(build_ext, include_dirs, extra_compile_args):
 
 
 def build_torch_extension(build_ext, options, torch_version):
-    pytorch_compile_flags = ["-std=c++14" if flag == "-std=c++11" 
+    pytorch_compile_flags = ["-std=c++17" if flag == "-std=c++17"
                              else flag for flag in options['COMPILE_FLAGS']]
     have_cuda = is_torch_cuda(build_ext, include_dirs=options['INCLUDES'],
                               extra_compile_args=pytorch_compile_flags)
