@@ -54,6 +54,8 @@ EXTRAS = {
 # ------------------------------------------------
 # Except, perhaps the License and Trove Classifiers!
 # If you do change the License, remember to change the Trove Classifier for that!
+os.environ["CC"] = "gcc"
+os.environ["CXX"] = "g++"
 
 here = os.path.abspath(os.path.dirname(__file__))
 
