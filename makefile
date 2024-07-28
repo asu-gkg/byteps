@@ -10,5 +10,9 @@ install:
 build:
 	sudo python3 setup.py build_ext --inplace
 
+clean:
+	python3 setup.py clean
+	rm -rf build *.egg-info dist
+
 run-server:
 	python3 -c "import byteps.server"
