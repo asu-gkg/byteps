@@ -72,6 +72,7 @@ pip3 install byteps
                  --device /dev/nvidia-uvm:/dev/nvidia-uvm   \
                  --device /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools \
                  -p 2222:22                                 \
+                 --net=host                                 \
                  bytepsimage/pytorch bash
 ```
 
