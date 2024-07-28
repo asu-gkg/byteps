@@ -4,8 +4,6 @@ prune .git
 prune dist
 prune bin
 prune __pycache__
-prune 3rdparty
-graft 3rdparty/ps-lite
 prune 3rdparty/ps-lite/build
 prune 3rdparty/ps-lite/deps
 exclude 3rdparty/ps-lite/tests/test_benchmark
