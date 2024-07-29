@@ -2,23 +2,6 @@ import byteps.torch as bps
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import os
-
-os.environ["DMLC_NUM_WORKER"] = "1"
-os.environ["DMLC_NUM_SERVER"] = "1"
-os.environ["DMLC_PS_ROOT_URI"] = "10.4.5.140"
-os.environ["DMLC_PS_ROOT_PORT"] = "1234"
-os.environ["BYTEPS_LOG_LEVEL"] = "INFO"
-os.environ["BYTEPS_MIN_COMPRESS_BYTES"] = "0"
-os.environ["BYTEPS_PARTITION_BYTES"] = "2147483647"
-os.environ["NVIDIA_VISIBLE_DEVICES"] = "0"
-os.environ["DMLC_WORKER_ID"] = "0"
-os.environ["DMLC_ROLE"] = "worker"
-os.environ["BYTEPS_THREADPOOL_SIZE"] = "4"
-os.environ["BYTEPS_FORCE_DISTRIBUTED"] = "1"
-os.environ["BYTEPS_LOCAL_RANK"] = "0"
-os.environ["BYTEPS_LOCAL_SIZE"] = "1"
-
 
 bps.init(lazy=False)
 
