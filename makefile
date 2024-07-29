@@ -36,3 +36,9 @@ run-scheduler:
 
 test-benchmark:
 	bpslaunch python3 example/pytorch/benchmark_byteps.py
+
+install-server:
+	export BYTEPS_WITHOUT_PYTORCH=1; sudo python3 setup.py install
+
+build-server:
+	export BYTEPS_WITHOUT_PYTORCH=1; python3 setup.py build_ext --inplace
