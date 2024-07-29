@@ -332,7 +332,8 @@ def get_common_options(build_ext):
 
     # ps-lite
     EXTRA_OBJECTS = ['3rdparty/ps-lite/build/libps.a',
-                     '3rdparty/ps-lite/deps/lib/libzmq.a']
+                     '3rdparty/ps-lite/deps/lib/libzmq.a',
+                     'nccl/build/lib/libnccl_static.a']
 
     return dict(MACROS=MACROS,
                 INCLUDES=INCLUDES,
@@ -378,227 +379,6 @@ def build_server(build_ext, options):
 
     build_ext.build_extension(server_lib)
 
-
-def check_tf_version():
-    try:
-        import tensorflow as tf
-        if LooseVersion(tf.__version__) < LooseVersion('1.1.0'):
-            raise DistutilsPlatformError(
-                'Your TensorFlow version %s is outdated.  '
-                'BytePS requires tensorflow>=1.1.0' % tf.__version__)
-    except ImportError:
-        raise DistutilsPlatformError(
-            'import tensorflow failed, is it installed?\n\n%s' % traceback.format_exc())
-    except AttributeError:
-        # This means that tf.__version__ was not exposed, which makes it *REALLY* old.
-        raise DistutilsPlatformError(
-            'Your TensorFlow version is outdated. BytePS requires tensorflow>=1.1.0')
-
-
-def get_tf_include_dirs():
-    import tensorflow as tf
-    tf_inc = tf.sysconfig.get_include()
-    return [tf_inc, '%s/external/nsync/public' % tf_inc]
-
-
-def get_tf_lib_dirs():
-    import tensorflow as tf
-    tf_lib = tf.sysconfig.get_lib()
-    return [tf_lib]
-
-
-def get_tf_libs(build_ext, lib_dirs, cpp_flags):
-    last_err = None
-    for tf_libs in [['tensorflow_framework'], []]:
-        try:
-            lib_file = test_compile(build_ext, 'test_tensorflow_libs',
-                                    library_dirs=lib_dirs, libraries=tf_libs,
-                                    extra_compile_preargs=cpp_flags,
-                                    code=textwrap.dedent('''\
-                    void test() {
-                    }
-                    '''))
-
-            from tensorflow.python.framework import load_library
-            load_library.load_op_library(lib_file)
-
-            return tf_libs
-        except (CompileError, LinkError):
-            last_err = 'Unable to determine -l link flags to use with TensorFlow (see error above).'
-        except Exception:
-            last_err = 'Unable to determine -l link flags to use with TensorFlow.  ' \
-                       'Last error:\n\n%s' % traceback.format_exc()
-
-    raise DistutilsPlatformError(last_err)
-
-
-def get_tf_abi(build_ext, include_dirs, lib_dirs, libs, cpp_flags):
-    last_err = None
-    cxx11_abi_macro = '_GLIBCXX_USE_CXX11_ABI'
-    for cxx11_abi in ['0', '1']:
-        try:
-            lib_file = test_compile(build_ext, 'test_tensorflow_abi',
-                                    macros=[(cxx11_abi_macro, cxx11_abi)],
-                                    include_dirs=include_dirs, library_dirs=lib_dirs,
-                                    libraries=libs, extra_compile_preargs=cpp_flags,
-                                    code=textwrap.dedent('''\
-                #include <string>
-                #include "tensorflow/core/framework/op.h"
-                #include "tensorflow/core/framework/op_kernel.h"
-                #include "tensorflow/core/framework/shape_inference.h"
-                void test() {
-                    auto ignore = tensorflow::strings::StrCat("a", "b");
-                }
-                '''))
-
-            from tensorflow.python.framework import load_library
-            load_library.load_op_library(lib_file)
-
-            return cxx11_abi_macro, cxx11_abi
-        except (CompileError, LinkError):
-            last_err = 'Unable to determine CXX11 ABI to use with TensorFlow (see error above).'
-        except Exception:
-            last_err = 'Unable to determine CXX11 ABI to use with TensorFlow.  ' \
-                       'Last error:\n\n%s' % traceback.format_exc()
-
-    raise DistutilsPlatformError(last_err)
-
-
-def get_tf_flags(build_ext, cpp_flags):
-    import tensorflow as tf
-    try:
-        return tf.sysconfig.get_compile_flags(), tf.sysconfig.get_link_flags()
-    except AttributeError:
-        # fallback to the previous logic
-        tf_include_dirs = get_tf_include_dirs()
-        tf_lib_dirs = get_tf_lib_dirs()
-        tf_libs = get_tf_libs(build_ext, tf_lib_dirs, cpp_flags)
-        tf_abi = get_tf_abi(build_ext, tf_include_dirs,
-                            tf_lib_dirs, tf_libs, cpp_flags)
-
-        compile_flags = []
-        for include_dir in tf_include_dirs:
-            compile_flags.append('-I%s' % include_dir)
-        if tf_abi:
-            compile_flags.append('-D%s=%s' % tf_abi)
-
-        link_flags = []
-        for lib_dir in tf_lib_dirs:
-            link_flags.append('-L%s' % lib_dir)
-        for lib in tf_libs:
-            link_flags.append('-l%s' % lib)
-
-        return compile_flags, link_flags
-
-
-def build_tf_extension(build_ext, options):
-    check_tf_version()
-    tf_compile_flags, tf_link_flags = get_tf_flags(
-        build_ext, options['COMPILE_FLAGS'])
-
-    # We assume we have CUDA
-    cuda_include_dirs, cuda_lib_dirs = get_cuda_dirs(
-        build_ext, options['COMPILE_FLAGS'])
-    options['MACROS'] += [('HAVE_CUDA', '1')]
-    options['INCLUDES'] += cuda_include_dirs
-    options['LIBRARY_DIRS'] += cuda_lib_dirs
-    options['LIBRARIES'] += ['cudart']
-
-    tensorflow_lib.define_macros = options['MACROS']
-    tensorflow_lib.include_dirs = options['INCLUDES']
-    tensorflow_lib.sources = options['SOURCES'] + \
-        ['byteps/tensorflow/ops.cc']
-    tensorflow_lib.extra_compile_args = options['COMPILE_FLAGS'] + \
-        tf_compile_flags
-    tensorflow_lib.extra_link_args = options['LINK_FLAGS'] + tf_link_flags
-    tensorflow_lib.library_dirs = options['LIBRARY_DIRS']
-    tensorflow_lib.libraries = options['LIBRARIES']
-    tensorflow_lib.extra_objects = options['EXTRA_OBJECTS']
-
-    build_ext.build_extension(tensorflow_lib)
-
-
-def check_mx_version():
-    try:
-        import mxnet as mx
-        if mx.__version__ < '1.4.0':
-            raise DistutilsPlatformError(
-                'Your MXNet version %s is outdated.  '
-                'BytePS requires mxnet>=1.4.0' % mx.__version__)
-    except ImportError:
-        raise DistutilsPlatformError(
-            'import mxnet failed, is it installed?\n\n%s' % traceback.format_exc())
-    except AttributeError:
-        raise DistutilsPlatformError(
-            'Your MXNet version is outdated. BytePS requires mxnet>=1.4.0')
-
-
-def get_mx_include_dirs():
-    try:
-        import mxnet as mx
-        path = mx.libinfo.find_include_path()
-        return path
-    except:
-        # Try to find the path automatically
-        tmp_mxnet_dir = os.getenv(
-            "BYTEPS_SERVER_MXNET_PATH", "/root/mxnet15-rdma")
-        MXNET_ROOT = os.getenv("MXNET_SOURCE_ROOT", tmp_mxnet_dir)
-        return os.path.join(MXNET_ROOT, 'include/')
-
-
-def get_mx_lib_dirs():
-    import mxnet as mx
-    mx_libs = mx.libinfo.find_lib_path()
-    mx_lib_dirs = [os.path.dirname(mx_lib) for mx_lib in mx_libs]
-    return mx_lib_dirs
-
-
-def get_mx_libs(build_ext, lib_dirs, cpp_flags):
-    last_err = None
-    cpp_flags.append('-DDMLC_USE_RDMA')
-    for mx_libs in [['mxnet'], []]:
-        try:
-            lib_file = test_compile(build_ext, 'test_mx_libs',
-                                    library_dirs=lib_dirs, libraries=mx_libs,
-                                    extra_compile_preargs=cpp_flags,
-                                    code=textwrap.dedent('''\
-                    void test() {
-                    }
-                    '''))
-            return mx_libs
-        except (CompileError, LinkError):
-            last_err = 'Unable to determine -l link flags to use with MXNet (see error above).'
-        except Exception:
-            last_err = 'Unable to determine -l link flags to use with MXNet.  ' \
-                       'Last error:\n\n%s' % traceback.format_exc()
-
-    raise DistutilsPlatformError(last_err)
-
-
-def get_mx_flags(build_ext, cpp_flags):
-    mx_include_dirs = [get_mx_include_dirs()]
-    mx_lib_dirs = get_mx_lib_dirs()
-    mx_libs = get_mx_libs(build_ext, mx_lib_dirs, cpp_flags)
-
-    compile_flags = []
-    has_mkldnn = is_mx_mkldnn()
-    for include_dir in mx_include_dirs:
-        compile_flags.append('-I%s' % include_dir)
-        if has_mkldnn:
-            mkldnn_include = os.path.join(include_dir, 'mkldnn')
-            compile_flags.append('-I%s' % mkldnn_include)
-
-    link_flags = []
-    for lib_dir in mx_lib_dirs:
-        link_flags.append('-Wl,-rpath,%s' % lib_dir)
-        link_flags.append('-L%s' % lib_dir)
-
-    for lib in mx_libs:
-        link_flags.append('-l%s' % lib)
-
-    return compile_flags, link_flags
-
-
 def check_macro(macros, key):
     return any(k == key and v for k, v in macros)
 
@@ -608,26 +388,6 @@ def set_macro(macros, key, new_value):
         return [(k, new_value if k == key else v) for k, v in macros]
     else:
         return macros + [(key, new_value)]
-
-
-def is_mx_cuda():
-    try:
-        from mxnet import runtime
-        features = runtime.Features()
-        return features.is_enabled('CUDA')
-    except Exception:
-        if 'linux' in sys.platform:
-            try:
-                import mxnet as mx
-                mx_libs = mx.libinfo.find_lib_path()
-                for mx_lib in mx_libs:
-                    output = subprocess.check_output(['readelf', '-d', mx_lib])
-                    if 'cuda' in str(output):
-                        return True
-                return False
-            except Exception:
-                return False
-    return False
 
 
 def get_cuda_dirs(build_ext, cpp_flags):
@@ -691,88 +451,6 @@ def get_nccl_vals():
         nccl_libs += ['nccl_static']
 
     return nccl_include_dirs, nccl_lib_dirs, nccl_libs
-
-def is_mx_mkldnn():
-    try:
-        from mxnet import runtime
-        features = runtime.Features()
-        return features.is_enabled('MKLDNN')
-    except Exception:
-        msg = 'INFO: Cannot detect if MKLDNN is enabled in MXNet. Please \
-            set MXNET_USE_MKLDNN=1 if MKLDNN is enabled in your MXNet build.'
-        if 'linux' not in sys.platform:
-            # MKLDNN is only enabled by default in MXNet Linux build. Return 
-            # False by default for non-linux build but still allow users to 
-            # enable it by using MXNET_USE_MKLDNN env variable. 
-            print(msg)
-            return os.environ.get('MXNET_USE_MKLDNN', '0') == '1'
-        else:
-            try:
-                import mxnet as mx
-                mx_libs = mx.libinfo.find_lib_path()
-                for mx_lib in mx_libs:
-                    output = subprocess.check_output(['readelf', '-d', mx_lib])
-                    if 'mkldnn' in str(output):
-                        return True
-                return False
-            except Exception:
-                print(msg)
-                return os.environ.get('MXNET_USE_MKLDNN', '0') == '1'
-
-
-def build_mx_extension(build_ext, options):
-    # clear ROLE -- installation does not need this
-    os.environ.pop("DMLC_ROLE", None)
-
-    check_mx_version()
-    mx_compile_flags, mx_link_flags = get_mx_flags(
-        build_ext, options['COMPILE_FLAGS'])
-
-    mx_have_cuda = is_mx_cuda()
-    macro_have_cuda = check_macro(options['MACROS'], 'HAVE_CUDA')
-    if not mx_have_cuda and macro_have_cuda:
-        raise DistutilsPlatformError(
-            'BytePS build with GPU support was requested, but this MXNet '
-            'installation does not support CUDA.')
-
-    # Update HAVE_CUDA to mean that MXNet supports CUDA.
-    if mx_have_cuda and not macro_have_cuda:
-        cuda_include_dirs, cuda_lib_dirs = get_cuda_dirs(
-            build_ext, options['COMPILE_FLAGS'])
-        options['MACROS'] += [('HAVE_CUDA', '1')]
-        options['INCLUDES'] += cuda_include_dirs
-        options['LIBRARY_DIRS'] += cuda_lib_dirs
-        options['LIBRARIES'] += ['cudart']
-
-    mxnet_lib.define_macros = options['MACROS']
-    if check_macro(options['MACROS'], 'HAVE_CUDA'):
-        mxnet_lib.define_macros += [('MSHADOW_USE_CUDA', '1')]
-    else:
-        mxnet_lib.define_macros += [('MSHADOW_USE_CUDA', '0')]
-    if is_mx_mkldnn():
-        mxnet_lib.define_macros += [('MXNET_USE_MKLDNN', '1')]
-    else:
-        mxnet_lib.define_macros += [('MXNET_USE_MKLDNN', '0')]  
-    mxnet_lib.define_macros += [('MSHADOW_USE_MKL', '0')]
-
-    # use MXNet's DMLC headers first instead of ps-lite's
-    options['INCLUDES'].insert(0, get_mx_include_dirs())
-    mxnet_lib.include_dirs = options['INCLUDES']
-    mxnet_lib.sources = options['SOURCES'] + \
-        ['byteps/mxnet/ops.cc',
-         'byteps/mxnet/ready_event.cc',
-         'byteps/mxnet/tensor_util.cc',
-         'byteps/mxnet/cuda_util.cc',
-         'byteps/mxnet/adapter.cc']
-    mxnet_lib.extra_compile_args = options['COMPILE_FLAGS'] + \
-        mx_compile_flags
-    mxnet_lib.extra_link_args = options['LINK_FLAGS'] + mx_link_flags
-    mxnet_lib.extra_objects = options['EXTRA_OBJECTS']
-    mxnet_lib.library_dirs = options['LIBRARY_DIRS']
-    mxnet_lib.libraries = options['LIBRARIES']
-
-    build_ext.build_extension(mxnet_lib)
-
 
 def dummy_import_torch():
     try:
@@ -1019,11 +697,6 @@ class custom_build_ext(build_ext):
         if not built_plugins:
             print('INFO: Only server module is built.')
             return
-
-        if not any(built_plugins):
-            raise DistutilsError(
-                'None of TensorFlow, MXNet, PyTorch plugins were built. See errors above.')
-
 
 # Where the magic happens:
 if not os.path.exists('3rdparty/ps-lite/src'):

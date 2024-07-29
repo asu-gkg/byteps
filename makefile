@@ -14,15 +14,15 @@ export SERVER_ENABLE_SCHEDULE=1
 export BYTEPS_SERVER_DEBUG=1
 export BYTEPS_TRACE_ON=1
 export BYTEPS_FORCE_DISTRIBUTED=1
-export BYTEPS_THREADPOOL_SIZE=1
+export BYTEPS_THREADPOOL_SIZE=4
 export BYTEPS_ENABLE_MIXED_MODE=1
-
+export CUDA_VISIBLE_DEVICES=0
 
 install:
 	sudo python3 setup.py install
 
 build:
-	sudo python3 setup.py build_ext --inplace
+	python3 setup.py build_ext --inplace
 
 clean:
 	sudo python3 setup.py clean
