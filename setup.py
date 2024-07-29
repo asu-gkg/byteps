@@ -332,8 +332,7 @@ def get_common_options(build_ext):
 
     # ps-lite
     EXTRA_OBJECTS = ['3rdparty/ps-lite/build/libps.a',
-                     '3rdparty/ps-lite/deps/lib/libzmq.a',
-                     'nccl/build/lib/libnccl_static.a']
+                     '3rdparty/ps-lite/deps/lib/libzmq.a']
 
     return dict(MACROS=MACROS,
                 INCLUDES=INCLUDES,
