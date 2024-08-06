@@ -37,7 +37,8 @@ void Postoffice::Init(ps::Node::Role role) {
       po_worker_group_.push_back(new Postoffice(i));
     }
   }
-  if (role == ps::Node::SERVER || role == ps::Node::JOINT) {
+  if (role == ps::Node::SERVER || role == ps::Node::JOINT 
+      || role == ps::Node::AGGREGATOR || role == ps::Node::ROOT) { 
     for (int i = 0; i < group_size; ++i) {
       po_server_group_.push_back(new Postoffice(i));
     }
@@ -72,7 +73,12 @@ void Postoffice::InitEnvironment() {
   is_worker_ = role == "worker";
   is_server_ = role == "server";
   is_scheduler_ = role == "scheduler";
+  is_aggregator_ = role == "aggregator";
+  is_root_ = role == "root";
   verbose_ = GetEnv("PS_VERBOSE", 0);
+
+  num_zones_ = GetEnv("DMLC_NUM_ZONES", 0);
+  zone_id_ = GetEnv("DMLC_ZONE_ID", 0);
 }
 
 void Postoffice::Start(int customer_id, const Node::Role role, int rank,
@@ -89,18 +95,40 @@ void Postoffice::Start(int customer_id, const Node::Role role, int rank,
         is_worker_ = true;
         is_server_ = false;
         is_scheduler_ = false;
+        is_aggregator_ = false;
+        is_root_ = false;
         break;
       }
       case Node::SERVER: {
         is_worker_ = false;
         is_server_ = true;
         is_scheduler_ = false;
+        is_aggregator_ = false;
+        is_root_ = false;
         break;
       }
       case Node::SCHEDULER: {
         is_worker_ = false;
         is_server_ = false;
         is_scheduler_ = true;
+        is_aggregator_ = false;
+        is_root_ = false;
+        break;
+      }
+      case Node::AGGREGATOR: {
+        is_worker_ = false;
+        is_server_ = false;
+        is_scheduler_ = false;
+        is_aggregator_ = true;
+        is_root_ = false;
+        break;
+      }
+      case Node::ROOT: {
+        is_worker_ = false;
+        is_server_ = false;
+        is_scheduler_ = false;
+        is_aggregator_ = false;
+        is_root_ = true;
         break;
       }
       default: {
@@ -120,7 +148,11 @@ void Postoffice::Start(int customer_id, const Node::Role role, int rank,
       int id = WorkerRankToID(i);
       for (int g : {id, kWorkerGroup, kWorkerGroup + kServerGroup,
                     kWorkerGroup + kScheduler,
-                    kWorkerGroup + kServerGroup + kScheduler}) {
+                    kWorkerGroup + kServerGroup + kScheduler, 
+                    kWorkerGroup + kAggregatorGroup, 
+                    kWorkerGroup + kAggregatorGroup + kScheduler, 
+                    kWorkerGroup + kAggregatorGroup + kScheduler + kRoot, 
+                    kWorkerGroup + kRoot}) {
         node_ids_[g].push_back(id);
       }
     }
@@ -134,8 +166,21 @@ void Postoffice::Start(int customer_id, const Node::Role role, int rank,
       }
     }
 
+    for (int i = 0; i < num_aggregators_; ++i) {
+      int id = AggregatorRankToID(i);
+      for (int g : {id, kAggregatorGroup, kWorkerGroup + kAggregatorGroup,
+                    kAggregatorGroup + kScheduler,
+                    kWorkerGroup + kAggregatorGroup + kScheduler,
+                    kWorkerGroup + kAggregatorGroup + kScheduler + kRoot}) {
+        node_ids_[g].push_back(id);
+      }
+    }
+
     for (int g : {kScheduler, kScheduler + kServerGroup + kWorkerGroup,
-                  kScheduler + kWorkerGroup, kScheduler + kServerGroup}) {
+                  kScheduler + kWorkerGroup, kScheduler + kServerGroup,
+                  kScheduler + kAggregatorGroup + kWorkerGroup,
+                  kScheduler + kAggregatorGroup, 
+                  kScheduler + kAggregatorGroup + kWorkerGroup + kRoot}) {
       node_ids_[g].push_back(kScheduler);
     }
     init_stage_++;
@@ -155,7 +200,7 @@ void Postoffice::Start(int customer_id, const Node::Role role, int rank,
   // do a barrier with all instances
   if (do_barrier) {
     bool instance_barrier = true;
-    DoBarrier(customer_id, kWorkerGroup + kServerGroup + kScheduler,
+    DoBarrier(customer_id, kWorkerGroup + kAggregatorGroup + kScheduler + kRoot,
               instance_barrier);
   }
 }

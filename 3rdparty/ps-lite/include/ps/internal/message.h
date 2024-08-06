@@ -77,13 +77,17 @@ struct Node {
   /** \brief default constructor */
   Node() : id(kEmpty), port(kEmpty), is_recovery(false), aux_id(-1) {}
   /** \brief node roles */
-  enum Role { SERVER, WORKER, SCHEDULER, JOINT };
+  enum Role { SERVER, WORKER, SCHEDULER, JOINT, AGGREGATOR, ROOT};
   /** \brief get debug string */
   std::string DebugString() const {
     std::stringstream ss;
     ss << "[role="
-       << (role == SERVER ? "server"
-                          : (role == WORKER ? "worker" : "scheduler"))
+       << (role == SERVER ? "server" 
+         : role == WORKER ? "worker" 
+         : role == SCHEDULER ? "scheduler"
+         : role == JOINT ? "joint"
+         : role == AGGREGATOR ? "aggregator"
+         : "root")
        << (id != kEmpty ? ", id=" + std::to_string(id) : "")
        << ", ip=" << hostname << ", port=" << port
        << ", is_recovery=" << is_recovery << ", aux_id=" << aux_id
@@ -143,6 +147,16 @@ struct Node {
    */
   /** also used for the rank assignment phase for p2p communication**/
   int aux_id = -1;
+
+  /** \brief number of zones */
+  int num_zones = 0; 
+  /** \brief group_id. used for zone worker/aggregator together */
+  int zone_id = -1;
+  /** \brief number of aggregators */
+  int num_aggregators = 0;
+  /** \brief workers of the zone */
+  std::vector<int> zone_workers;
+  std::vector<int> zone_aggregators;
 };
 
 /**

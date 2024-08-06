@@ -16,11 +16,16 @@ namespace ps {
 inline int NumWorkers() { return Postoffice::Get()->num_workers(); }
 /** \brief Returns the number of server nodes */
 inline int NumServers() { return Postoffice::Get()->num_servers(); }
-
+/** \brief Returns the number of server nodes */
+inline int NumZones() { return Postoffice::Get()->num_zones(); }
 /** \brief Returns true if this node is a server node. */
 inline bool IsServer() { return Postoffice::Get()->is_server(); }
 /** \brief Returns true if this node is a scheduler node. */
 inline bool IsScheduler() { return Postoffice::Get()->is_scheduler(); }
+/** \brief Returns true if this node is a aggregator node. */
+inline bool IsAggregator() { return Postoffice::Get()->is_aggregator(); }
+/** \brief Returns true if this node is a root node. */
+inline bool IsRoot() { return Postoffice::Get()->is_root(); }
 /** \brief Returns the rank of this node in its group
  *
  * Each worker will have a unique rank within [0, NumWorkers()). So are
@@ -47,6 +52,10 @@ inline Node::Role GetRole(const std::string role_str) {
     role = Node::SCHEDULER;
   } else if (role_str == "joint") {
     role = Node::JOINT;
+  } else if (role_str == "aggregator") {
+    role = Node::AGGREGATOR;
+  } else if (role_str == "root") {
+    role = Node::ROOT;
   } else {
     CHECK(false) << "Unexpected role: " << role_str;
   }
@@ -63,7 +72,7 @@ inline void _StartPS(int customer_id, Node::Role role, int rank,
   if (role == Node::WORKER) {
     Postoffice::GetWorker(instance_idx)
         ->Start(customer_id, role, rank, do_barrier, argv0);
-  } else if (role == Node::SERVER || role == Node::SCHEDULER) {
+  } else if (role == Node::SERVER || role == Node::SCHEDULER || role == Node::AGGREGATOR || role == Node::ROOT) {
     Postoffice::GetServer(instance_idx)
         ->Start(customer_id, role, rank, do_barrier, argv0);
   } else {
@@ -153,7 +162,7 @@ inline void _Finalize(int customer_id, Node::Role role,
                       const bool do_barrier = true, int index = 0) {
   if (role == Node::WORKER) {
     Postoffice::GetWorker(index)->Finalize(customer_id, do_barrier);
-  } else if (role == Node::SERVER || role == Node::SCHEDULER) {
+  } else if (role == Node::SERVER || role == Node::SCHEDULER || role == Node::AGGREGATOR || role == Node::ROOT) {
     Postoffice::GetServer(index)->Finalize(customer_id, do_barrier);
   } else {
     // Joint PS: one worker, one server

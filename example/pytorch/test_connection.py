@@ -24,3 +24,4 @@ optimizer = bps.DistributedOptimizer(optimizer=optimizer,
                                         named_parameters=net.named_parameters(),
                                         compression=bps.Compression.none)
 bps.broadcast_parameters(net.state_dict(), root_rank=0)
+

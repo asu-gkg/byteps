@@ -11,6 +11,10 @@
 #include "ps/internal/env.h"
 #include "ps/internal/van.h"
 #include "ps/range.h"
+#define WORKER_BASE_ID 1000
+#define SERVER_BASE_ID 2000
+#define AGGREGATOR_BASE_ID 3000
+#define ROOT_BASE_ID 4000
 namespace ps {
 
 /**
@@ -168,26 +172,35 @@ class Postoffice {
     int group_rank = instance_rank / group_size_;
     return group_rank;
   }
-
   /**
    * \brief convert from a worker rank into a node id
    * \param rank the worker rank
    */
-  static inline int WorkerRankToID(int rank) { return rank * 2 + 9; }
+  static inline int WorkerRankToID(int rank) { return rank + WORKER_BASE_ID; }
   /**
    * \brief convert from a server rank into a node id
    * \param rank the server rank
    */
-  static inline int ServerRankToID(int rank) { return rank * 2 + 8; }
+  static inline int ServerRankToID(int rank) { return rank + SERVER_BASE_ID; }
+
+  static inline int AggregatorRankToID(int rank) { return rank + AGGREGATOR_BASE_ID; }
+
+  static inline int RootRankToID(int rank) { return rank + ROOT_BASE_ID; }
   /**
    * \brief convert from a node id into a server or worker rank
    * \param id the node id
    */
   static inline int IDtoRank(int id) {
-#ifdef _MSC_VER
-#undef max
-#endif
-    return std::max((id - 8) / 2, 0);
+    if (id >= WORKER_BASE_ID && id < SERVER_BASE_ID) {
+        return id - WORKER_BASE_ID;
+    } else if (id >= SERVER_BASE_ID && id < AGGREGATOR_BASE_ID) {
+        return id - SERVER_BASE_ID;
+    } else if (id >= AGGREGATOR_BASE_ID && id < ROOT_BASE_ID) {
+        return id - AGGREGATOR_BASE_ID;
+    } else if (id >= ROOT_BASE_ID) {
+        return id - ROOT_BASE_ID;
+    }
+    return -1;
   }
   /** \brief Returns the size of a worker/server group */
   int group_size() const { return group_size_; }
@@ -195,6 +208,8 @@ class Postoffice {
   int num_workers() const { return num_workers_; }
   /** \brief Returns the number of server groups */
   int num_servers() const { return num_servers_; }
+    /** \brief Returns the number of zones */
+  int num_zones() const { return num_zones_; }
   /** \brief Returns the number of worker instances */
   int num_worker_instances() const { return num_workers_ * group_size_; }
   /** \brief Returns the number of server instances */
@@ -215,11 +230,17 @@ class Postoffice {
   /** \brief Returns true if this node is a scheduler node. */
   int is_scheduler() const { return is_scheduler_; }
 
+  int is_aggregator() const { return is_aggregator_; }
+
+  int is_root() const { return is_root_; }
+
   std::string role_str() const {
     std::string str;
     if (is_worker_) str = "worker";
     if (is_scheduler_) str = "scheduler";
     if (is_server_) str = "server";
+    if (is_aggregator_) str = "aggregator";
+    if (is_root_) str = "root";
     return str;
   }
   /** \brief Returns the verbose level. */
@@ -288,8 +309,10 @@ class Postoffice {
   std::unordered_map<int, std::vector<int>> node_ids_;
   std::mutex server_key_ranges_mu_;
   std::vector<Range> server_key_ranges_;
-  bool is_worker_, is_server_, is_scheduler_;
+  bool is_worker_, is_server_, is_scheduler_, is_aggregator_, is_root_;
   int num_servers_, num_workers_, group_size_;
+  int num_aggregators_;
+  int num_zones_, zone_id_;
 
   // a hint for preferred rank
   int preferred_rank_;

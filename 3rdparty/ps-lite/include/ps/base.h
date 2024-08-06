@@ -24,6 +24,13 @@ static const int kScheduler = 1;
 static const int kServerGroup = 2;
 /** \brief the worker node group ID */
 static const int kWorkerGroup = 4;
-
+/** \brief node ID for the root */
+static const int kRoot = 8;
+/** \brief node ID for the aggregator 
+ * group id can be combined:
+ * - kAggregatorGroup + kScheduler means all aggregator nodes and the scheuduler
+ * - kAggregatorGroup + kWorkerGroup means all aggregator and worker nodes
+*/
+static const int kAggregatorGroup = 16;
 }  // namespace ps
 #endif  // PS_BASE_H_

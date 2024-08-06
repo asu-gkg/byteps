@@ -28,6 +28,7 @@ sudo docker run \
     --cap-add=SYS_PTRACE \
     --security-opt seccomp=unconfined \
     --name=bps \
+    --shm-size=32768m \
     --net=host    \
     -itd byteps:0.1 \
     zsh

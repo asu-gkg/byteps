@@ -53,6 +53,9 @@ Van *Van::Create(const std::string &type, Postoffice *postoffice) {
       sysvar = std::string(getenv("PROFILE_PATH"));
     std::string CONST_WORKER_STR("worker");
     std::string CONST_SERVER_STR("server");
+    std::string CONST_SCHEDULER_STR("scheduler");
+    std::string CONST_SERVER_STR("aggregator");
+    std::string CONST_SERVER_STR("root");
 
     std::chrono::microseconds ms =
         std::chrono::duration_cast<std::chrono::microseconds>(
@@ -242,9 +245,15 @@ void Van::ProcessAddNodeCommandAtScheduler(Message *msg, Meta *nodes,
       if (node.role == Node::SERVER) {
         id = Postoffice::ServerRankToID(with_preferred_rank ? node.aux_id
                                                             : num_servers_);
-      } else {
+      } else if (node.role == Node::WORKER){
         id = Postoffice::WorkerRankToID(with_preferred_rank ? node.aux_id
                                                             : num_workers_);
+      } else if (node.role == Node::AGGREGATOR){
+        id = Postoffice::AggregatorRankToID(with_preferred_rank ? node.aux_id
+                                                            : num_aggregators_);
+      } else if (node.role == Node::ROOT) {
+        id = Postoffice::RootRankToID(with_preferred_rank ? node.aux_id
+                                                            : num_roots_);
       }
       if (connected_nodes_.find(node_host_ip) == connected_nodes_.end()) {
         CHECK_EQ(node.id, Node::kEmpty);
@@ -259,12 +268,14 @@ void Van::ProcessAddNodeCommandAtScheduler(Message *msg, Meta *nodes,
       }
       if (node.role == Node::SERVER) num_servers_++;
       if (node.role == Node::WORKER) num_workers_++;
+      if (node.role == Node::AGGREGATOR) num_aggregators_++;
+      if (node.role == Node::ROOT) num_roots_++;
     }
     nodes->control.node.push_back(my_node_);
     nodes->control.cmd = Control::ADD_NODE;
     Message back;
     back.meta = *nodes;
-    for (int r : postoffice_->GetNodeIDs(kWorkerGroup + kServerGroup)) {
+    for (int r : postoffice_->GetNodeIDs(kWorkerGroup + kAggregatorGroup + kRoot)) {
       int recver_id = r;
       if (shared_node_mapping_.find(r) == shared_node_mapping_.end()) {
         back.meta.recver = recver_id;
@@ -283,7 +294,7 @@ void Van::ProcessAddNodeCommandAtScheduler(Message *msg, Meta *nodes,
     Connect(recovery_nodes->control.node[0]);
     postoffice_->UpdateHeartbeat(recovery_nodes->control.node[0].id, t);
     Message back;
-    for (int r : postoffice_->GetNodeIDs(kWorkerGroup + kServerGroup)) {
+    for (int r : postoffice_->GetNodeIDs(kWorkerGroup + kAggregatorGroup + kRoot)) {
       if (r != recovery_nodes->control.node[0].id &&
           dead_set.find(r) != dead_set.end()) {
         // do not try to send anything to dead node
@@ -504,6 +515,8 @@ void Van::ProcessAddNodeCommand(Message *msg, Meta *nodes,
       }
       if (!node.is_recovery && node.role == Node::SERVER) ++num_servers_;
       if (!node.is_recovery && node.role == Node::WORKER) ++num_workers_;
+      if (!node.is_recovery && node.role == Node::AGGREGATOR) ++num_aggregators_;
+      if (!node.is_recovery && node.role == Node::ROOT) ++num_roots_;
     }
     PS_VLOG(1) << my_node_.ShortDebugString() << " is connected to others";
     ready_ = true;
@@ -524,13 +537,22 @@ void Van::Start(int customer_id, bool standalone) {
     scheduler_.dev_ids[0] = 0;
     scheduler_.role = Node::SCHEDULER;
     scheduler_.id = kScheduler;
+    scheduler_.num_zones = atoi(CHECK_NOTNULL(Environment::Get()->find("DMLC_NUM_ZONES")));
+    scheduler_.num_aggregators = atoi(CHECK_NOTNULL(Environment::Get()->find("DMLC_NUM_AGGREGATORS")));
     is_scheduler_ = postoffice_->is_scheduler();
 
     // get my node info
     if (is_scheduler_) {
       SetNode(scheduler_);
     } else {
-      auto role = postoffice_->is_worker() ? Node::WORKER : Node::SERVER;
+      auto role = Node::WORKER;
+      if (postoffice_->is_server()){
+        role = Node::SERVER;
+      } else if (postoffice_->is_aggregator()){
+        role = Node::AGGREGATOR;
+      } else if (postoffice_->is_root()){
+        role = Node::ROOT;
+      }
       // host
       const char *nhost = Environment::Get()->find("DMLC_NODE_HOST");
       std::string ip;
@@ -571,6 +593,8 @@ void Van::Start(int customer_id, bool standalone) {
       // set it explicitly to make re-register within a same process possible
       node.id = Node::kEmpty;
       node.customer_id = customer_id;
+      node.num_zones = atoi(Environment::Get()->find("DMLC_NUM_ZONES"));
+      node.num_aggregators = atoi(Environment::Get()->find("DMLC_NUM_AGGREGATORS"));
       SetNode(node);
     }
 

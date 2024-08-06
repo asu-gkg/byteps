@@ -193,6 +193,12 @@ class Van {
   // the id of (group) barrier request senders, used for group-level barrier
   std::unordered_map<int, std::vector<int>> group_barrier_requests_;
 
+  int num_aggregators_ = 0;
+
+  int num_roots_ = 0;
+
+  int root_id_ = 8964;
+
   /** msg resender */
   Resender *resender_ = nullptr;
   int drop_rate_ = 0;
